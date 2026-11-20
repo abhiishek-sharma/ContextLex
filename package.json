@@ -1,0 +1,12 @@
+{
+  "name": "contextlex",
+  "private": true,
+  "description": "Development scripts for the ContextLex Chrome extension. The extension itself has no dependencies and no build step.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

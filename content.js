@@ -5,6 +5,10 @@
   if (window.__contextLexLoaded) return;
   window.__contextLexLoaded = true;
 
+  // Pure logic lives in core.js, which the manifest loads first.
+  const core = globalThis.ContextLexCore;
+  if (!core) return;
+
   let tooltip = null;
   let currentText = null;
   let isMouseDown = false;
@@ -29,21 +33,6 @@
     currentText = null;
   }
 
-  // Validate that selection is valid text (single word or phrase)
-  function isValidText(text) {
-    if (!text || text.length === 0 || text.length > 100) return false;
-
-    // Allow letters, spaces, hyphens, and apostrophes
-    // This supports single words and multi-word phrases
-    const textPattern = /^[a-zA-ZÀ-ÿ'-]+(\s+[a-zA-ZÀ-ÿ'-]+)*$/;
-    return textPattern.test(text);
-  }
-
-  // Check if text is a single word
-  function isSingleWord(text) {
-    return text && !/\s/.test(text.trim());
-  }
-
   // Position tooltip near selection
   function positionTooltip(selection) {
     if (!tooltip || !selection.rangeCount) return;
@@ -51,111 +40,52 @@
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
-    const tooltipWidth = tooltip.offsetWidth;
-    const tooltipHeight = tooltip.offsetHeight;
+    const position = core.computePosition({
+      rect,
+      tooltip: { width: tooltip.offsetWidth, height: tooltip.offsetHeight },
+      viewport: {
+        width: document.documentElement.clientWidth,
+        height: document.documentElement.clientHeight,
+      },
+      scroll: { x: window.scrollX, y: window.scrollY },
+    });
 
-    let top = rect.bottom + window.scrollY + 8;
-    let left = rect.left + window.scrollX + rect.width / 2 - tooltipWidth / 2;
-
-    // Keep within viewport horizontally
-    const viewportWidth = document.documentElement.clientWidth;
-    if (left < 8) left = 8;
-    if (left + tooltipWidth > viewportWidth - 8) {
-      left = viewportWidth - tooltipWidth - 8;
-    }
-
-    // If tooltip would go below viewport, show above selection
-    const viewportHeight = document.documentElement.clientHeight;
-    if (rect.bottom + tooltipHeight + 16 > viewportHeight) {
-      top = rect.top + window.scrollY - tooltipHeight - 8;
-    }
-
-    tooltip.style.top = `${Math.max(8, top)}px`;
-    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${position.top}px`;
+    tooltip.style.left = `${position.left}px`;
   }
 
   // Fetch word definition from Free Dictionary API
   async function fetchDefinition(word) {
-    const apiUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`;
-
     try {
-      const response = await fetch(apiUrl);
+      const response = await fetch(core.buildApiUrl(word));
 
       if (!response.ok) {
         return null;
       }
 
-      const data = await response.json();
-
-      if (!Array.isArray(data) || data.length === 0) {
-        return null;
-      }
-
-      const entry = data[0];
-      const meanings = [];
-
-      // Extract up to 3 meanings for brevity
-      for (const meaning of entry.meanings || []) {
-        if (meanings.length >= 3) break;
-
-        const partOfSpeech = meaning.partOfSpeech || "";
-        const definitions = meaning.definitions || [];
-
-        if (definitions.length > 0) {
-          meanings.push({
-            partOfSpeech,
-            definition: definitions[0].definition,
-            example: definitions[0].example || null,
-          });
-        }
-      }
-
-      if (meanings.length === 0) return null;
-
-      return {
-        word: entry.word || word,
-        phonetic:
-          entry.phonetic ||
-          (entry.phonetics && entry.phonetics[0]?.text) ||
-          null,
-        meanings,
-      };
+      return core.parseEntry(await response.json(), word);
     } catch (error) {
       console.error("ContextLex: Failed to fetch definition", error);
       return null;
     }
   }
 
-  // Fetch phrase meaning using Datamuse API for related words/concepts
-  async function fetchPhraseInfo(phrase) {
-    // For phrases, try to provide a combined meaning
-    const words = phrase.split(/\s+/);
-
-    // Try to fetch definitions for individual words in the phrase
-    const definitions = [];
-    for (const word of words.slice(0, 3)) {
-      // Limit to first 3 words
-      const def = await fetchDefinition(word);
-      if (def) {
-        definitions.push(def);
+  // A multi-word selection is not looked up as a phrase: the first few
+  // words are looked up one by one and shown together.
+  async function fetchPhraseInfo(phrase, words) {
+    const entries = [];
+    for (const word of words.slice(0, core.MAX_PHRASE_WORDS)) {
+      const entry = await fetchDefinition(word);
+      if (entry) {
+        entries.push(entry);
       }
     }
 
-    if (definitions.length === 0) {
+    if (entries.length === 0) {
       return null;
     }
 
-    // Combine definitions into a phrase explanation
-    return {
-      word: phrase,
-      phonetic: null,
-      isPhrase: true,
-      meanings: definitions.map((d) => ({
-        partOfSpeech: `${d.word} (${d.meanings[0]?.partOfSpeech || "word"})`,
-        definition: d.meanings[0]?.definition || "",
-        example: d.meanings[0]?.example || null,
-      })),
-    };
+    return core.combinePhrase(phrase, entries);
   }
 
   // Render tooltip content
@@ -210,24 +140,25 @@
   // Main handler for text selection
   async function handleSelection() {
     const selection = window.getSelection();
-    const text = selection ? selection.toString().trim() : "";
+    const text = selection ? core.cleanSelection(selection.toString()) : "";
 
     // Ignore if same text or invalid
-    if (!text || text === currentText || !isValidText(text)) {
+    if (!text || text === currentText || !core.isValidText(text)) {
       return;
     }
 
     currentText = text;
     showLoading(selection);
 
+    const words = core.splitWords(text);
     let definition = null;
 
-    if (isSingleWord(text)) {
+    if (words.length === 1) {
       // Single word - fetch from dictionary API
-      definition = await fetchDefinition(text);
+      definition = await fetchDefinition(words[0]);
     } else {
-      // Multi-word phrase - get combined definitions
-      definition = await fetchPhraseInfo(text);
+      // Several words - show the first meaning of each
+      definition = await fetchPhraseInfo(text, words);
     }
 
     // Check if text changed during fetch
@@ -251,12 +182,7 @@
 
     // Small delay to let selection complete
     setTimeout(() => {
-      const selection = window.getSelection();
-      const text = selection ? selection.toString().trim() : "";
-
-      if (text && text !== currentText && isValidText(text)) {
-        handleSelection();
-      }
+      handleSelection();
     }, 50);
   });
 
@@ -279,13 +205,7 @@
       // Don't trigger during mouse drag
       if (isMouseDown) return;
 
-      const selection = window.getSelection();
-      const text = selection ? selection.toString().trim() : "";
-
-      // Only trigger if it looks like a deliberate selection
-      if (text && text !== currentText && isValidText(text)) {
-        handleSelection();
-      }
+      handleSelection();
     }, 400);
   });
 
