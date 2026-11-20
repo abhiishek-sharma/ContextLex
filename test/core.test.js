@@ -821,9 +821,20 @@ describe("isSelectingInFocusedField", () => {
     assert.equal(core.isSelectingInFocusedField(field("TEXTAREA", 0, 0)), false);
   });
 
-  test("is true for a field that does not report its selection", () => {
-    // Chrome returns null for email and number inputs.
-    assert.equal(core.isSelectingInFocusedField(field("INPUT", null, null, { type: "email" })), true);
+  test("is true for an email or number field, which does not report its selection", () => {
+    // Chrome returns null selectionStart for these, though they hold text.
+    for (const type of ["email", "number"]) {
+      const input = field("INPUT", null, null, { type });
+      assert.equal(core.isSelectingInFocusedField(input), true, type);
+    }
+  });
+
+  test("is false for focused inputs that hold no text to select", () => {
+    const types = ["checkbox", "radio", "range", "button", "submit", "reset", "file", "color"];
+    for (const type of types) {
+      const input = field("INPUT", null, null, { type });
+      assert.equal(core.isSelectingInFocusedField(input), false, type);
+    }
   });
 
   test("is true for focused contenteditable content", () => {

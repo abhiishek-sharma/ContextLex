@@ -100,19 +100,27 @@
     return false;
   }
 
+  // Input types that hold typed text but report a null selectionStart.
+  const TEXT_TYPES_WITHOUT_SELECTION_API = new Set(["email", "number"]);
+
   // True when the focused element holds the selection the user is making:
   // a text field with selected text in it, or contenteditable content. A
   // field with only the caret in it does not count, so page text can still
-  // be looked up while a search box keeps focus. Field types that do not
-  // report their selection (email and number return null) are counted.
+  // be looked up while a search box keeps focus. Email and number fields
+  // do not report their selection, so they are counted whenever they have
+  // focus. Other inputs that report null (checkbox, radio, range, button,
+  // file, color...) hold no text to select and are not counted.
   function isSelectingInFocusedField(active) {
     if (!active || active.nodeType !== 1) return false;
 
     const tag = String(active.tagName || "").toUpperCase();
     if (tag === "INPUT" || tag === "TEXTAREA") {
       const { selectionStart, selectionEnd } = active;
-      if (typeof selectionStart !== "number") return true;
-      return selectionStart !== selectionEnd;
+      if (typeof selectionStart === "number") {
+        return selectionStart !== selectionEnd;
+      }
+      const type = String(active.type || "").toLowerCase();
+      return TEXT_TYPES_WITHOUT_SELECTION_API.has(type);
     }
     return isEditableNode(active);
   }
