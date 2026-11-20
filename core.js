@@ -21,6 +21,8 @@
   const MAX_SELECTION_LENGTH = 100;
   const MAX_MEANINGS = 3;
   const MAX_PHRASE_WORDS = 3;
+  const LOOKUP_TIMEOUT_MS = 8000;
+  const CACHE_MAX_ENTRIES = 100;
 
   // ASCII letters plus the Latin-1 accented letters (so "café" and "naïve"
   // work). The two gaps skip the multiplication and division signs.
@@ -214,10 +216,163 @@
     };
   }
 
+  // ---------------------------------------------------------------------
+  // Lookup: cache, timeout, cancellation
+  // ---------------------------------------------------------------------
+
+  // A small least-recently-used cache keyed by the word sent to the API.
+  function createCache(maxEntries = CACHE_MAX_ENTRIES) {
+    const entries = new Map();
+
+    return {
+      get(key) {
+        if (!entries.has(key)) return undefined;
+        const value = entries.get(key);
+        entries.delete(key);
+        entries.set(key, value);
+        return value;
+      },
+      set(key, value) {
+        entries.delete(key);
+        entries.set(key, value);
+        if (entries.size > maxEntries) {
+          entries.delete(entries.keys().next().value);
+        }
+      },
+      get size() {
+        return entries.size;
+      },
+    };
+  }
+
+  // Look up cleaned selection text. One word is shown as its dictionary
+  // entry; several words are looked up one by one (the first three only)
+  // and shown together.
+  //
+  //   options.fetchImpl  fetch-compatible function
+  //   options.signal     AbortSignal that cancels the lookup
+  //   options.cache      cache from createCache()
+  //   options.isOnline   returns false when the browser is offline
+  //   options.timeoutMs  time allowed for the whole lookup
+  //
+  // Resolves (it does not reject) with one of:
+  //   { status: "ok", data }             something to show
+  //   { status: "not_found" }            the dictionary has no definition
+  //   { status: "offline" }              no connection
+  //   { status: "timeout" }              no answer within timeoutMs
+  //   { status: "error", httpStatus? }   request failed or bad response
+  //   { status: "aborted" }              cancelled through options.signal
+  //
+  // Definitions and "not found" answers are cached; failures are not.
+  async function lookup(text, options) {
+    const {
+      fetchImpl,
+      signal,
+      cache,
+      isOnline = () => true,
+      timeoutMs = LOOKUP_TIMEOUT_MS,
+    } = options;
+
+    const allWords = splitWords(text);
+    const words = allWords.slice(0, MAX_PHRASE_WORDS);
+    if (words.length === 0) return { status: "not_found" };
+
+    // One controller serves both the caller's cancellation and the timeout.
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    const cancel = () => controller.abort();
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener("abort", cancel, { once: true });
+    }
+
+    function failure() {
+      if (timedOut) return { status: "timeout" };
+      if (controller.signal.aborted) return { status: "aborted" };
+      if (!isOnline()) return { status: "offline" };
+      return { status: "error" };
+    }
+
+    async function lookupWord(word) {
+      const cached = cache ? cache.get(word) : undefined;
+      if (cached) return cached;
+      if (controller.signal.aborted || !isOnline()) return failure();
+
+      let result;
+      try {
+        const response = await fetchImpl(buildApiUrl(word), {
+          signal: controller.signal,
+          credentials: "omit",
+          referrerPolicy: "no-referrer",
+        });
+
+        if (response.status === 404) {
+          result = { status: "not_found" };
+        } else if (!response.ok) {
+          return { status: "error", httpStatus: response.status };
+        } else {
+          const entry = parseEntry(await response.json(), word);
+          result = entry ? { status: "ok", entry } : { status: "not_found" };
+        }
+      } catch (error) {
+        return failure();
+      }
+
+      if (cache) cache.set(word, result);
+      return result;
+    }
+
+    try {
+      const entries = [];
+      let failed = null;
+
+      for (const word of words) {
+        const result = await lookupWord(word);
+        if (result.status === "aborted") return result;
+        if (result.status === "ok") {
+          entries.push(result.entry);
+        } else if (result.status !== "not_found") {
+          // Offline, timed out or failing: the next word would go the same way.
+          failed = result;
+          break;
+        }
+      }
+
+      if (entries.length === 0) return failed || { status: "not_found" };
+      if (allWords.length === 1) return { status: "ok", data: entries[0] };
+      return { status: "ok", data: combinePhrase(text, entries) };
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", cancel);
+    }
+  }
+
+  // The message shown for every lookup result that is not "ok".
+  function describeFailure(result, text) {
+    switch (result.status) {
+      case "not_found":
+        return `No definition found for "${text}".`;
+      case "offline":
+        return "You appear to be offline. Reconnect and try again.";
+      case "timeout":
+        return "The dictionary did not respond in time. Try again.";
+      default:
+        return result.httpStatus
+          ? `The dictionary returned an error (HTTP ${result.httpStatus}). Try again later.`
+          : "Could not reach the dictionary. Try again later.";
+    }
+  }
+
   return {
     MAX_SELECTION_LENGTH,
     MAX_MEANINGS,
     MAX_PHRASE_WORDS,
+    LOOKUP_TIMEOUT_MS,
+    CACHE_MAX_ENTRIES,
     cleanSelection,
     isValidText,
     toApiWord,
@@ -227,5 +382,8 @@
     parseEntry,
     combinePhrase,
     computePosition,
+    createCache,
+    lookup,
+    describeFailure,
   };
 });

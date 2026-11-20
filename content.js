@@ -9,8 +9,12 @@
   const core = globalThis.ContextLexCore;
   if (!core) return;
 
+  // Definitions already fetched on this page, so a word is requested once.
+  const cache = core.createCache();
+
   let tooltip = null;
   let currentText = null;
+  let activeLookup = null; // AbortController of the lookup in flight
   let isMouseDown = false;
 
   // Create tooltip element
@@ -24,8 +28,17 @@
     return tooltip;
   }
 
+  // Stop the lookup in flight, if any
+  function cancelLookup() {
+    if (activeLookup) {
+      activeLookup.abort();
+      activeLookup = null;
+    }
+  }
+
   // Remove tooltip
   function hideTooltip() {
+    cancelLookup();
     if (tooltip && tooltip.parentNode) {
       tooltip.remove();
       tooltip = null;
@@ -33,11 +46,10 @@
     currentText = null;
   }
 
-  // Position tooltip near selection
-  function positionTooltip(selection) {
-    if (!tooltip || !selection.rangeCount) return;
+  // Position tooltip near the selected range
+  function positionTooltip(range) {
+    if (!tooltip) return;
 
-    const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
     const position = core.computePosition({
@@ -54,40 +66,6 @@
     tooltip.style.left = `${position.left}px`;
   }
 
-  // Fetch word definition from Free Dictionary API
-  async function fetchDefinition(word) {
-    try {
-      const response = await fetch(core.buildApiUrl(word));
-
-      if (!response.ok) {
-        return null;
-      }
-
-      return core.parseEntry(await response.json(), word);
-    } catch (error) {
-      console.error("ContextLex: Failed to fetch definition", error);
-      return null;
-    }
-  }
-
-  // A multi-word selection is not looked up as a phrase: the first few
-  // words are looked up one by one and shown together.
-  async function fetchPhraseInfo(phrase, words) {
-    const entries = [];
-    for (const word of words.slice(0, core.MAX_PHRASE_WORDS)) {
-      const entry = await fetchDefinition(word);
-      if (entry) {
-        entries.push(entry);
-      }
-    }
-
-    if (entries.length === 0) {
-      return null;
-    }
-
-    return core.combinePhrase(phrase, entries);
-  }
-
   // Build an element whose text is set with textContent, so nothing that
   // comes back from the API is ever parsed as HTML.
   function element(tag, className, text) {
@@ -102,14 +80,9 @@
     tooltip.replaceChildren(element("div", className, text));
   }
 
-  // Render tooltip content
-  function renderTooltip(data) {
+  // Render a definition
+  function renderDefinition(data) {
     if (!tooltip) return;
-
-    if (!data) {
-      showMessage("contextlex-error", "Definition not found");
-      return;
-    }
 
     const heading = element("div", "contextlex-word", data.word);
     if (data.phonetic) {
@@ -138,43 +111,53 @@
   }
 
   // Show loading state
-  function showLoading(selection) {
+  function showLoading(range) {
     createTooltip();
     showMessage("contextlex-loading", "Loading...");
     tooltip.style.opacity = "1";
     tooltip.style.visibility = "visible";
-    positionTooltip(selection);
+    positionTooltip(range);
   }
 
   // Main handler for text selection
   async function handleSelection() {
     const selection = window.getSelection();
-    const text = selection ? core.cleanSelection(selection.toString()) : "";
+    if (!selection || selection.rangeCount === 0) return;
+
+    const text = core.cleanSelection(selection.toString());
 
     // Ignore if same text or invalid
     if (!text || text === currentText || !core.isValidText(text)) {
       return;
     }
 
+    // A new lookup replaces the one in flight
+    cancelLookup();
+    const controller = new AbortController();
+    activeLookup = controller;
     currentText = text;
-    showLoading(selection);
 
-    const words = core.splitWords(text);
-    let definition = null;
+    // Keep our own copy: the live selection can change while we wait
+    const range = selection.getRangeAt(0).cloneRange();
+    showLoading(range);
 
-    if (words.length === 1) {
-      // Single word - fetch from dictionary API
-      definition = await fetchDefinition(words[0]);
+    const result = await core.lookup(text, {
+      fetchImpl: (url, init) => fetch(url, init),
+      signal: controller.signal,
+      cache,
+      isOnline: () => navigator.onLine !== false,
+    });
+
+    // Replaced by a newer lookup or dismissed while waiting
+    if (activeLookup !== controller) return;
+    activeLookup = null;
+
+    if (result.status === "ok") {
+      renderDefinition(result.data);
     } else {
-      // Several words - show the first meaning of each
-      definition = await fetchPhraseInfo(text, words);
+      showMessage("contextlex-error", core.describeFailure(result, text));
     }
-
-    // Check if text changed during fetch
-    if (text !== currentText) return;
-
-    renderTooltip(definition);
-    positionTooltip(selection);
+    positionTooltip(range);
   }
 
   // Track mouse state for selection detection

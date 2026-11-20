@@ -432,3 +432,312 @@ describe("computePosition", () => {
     assert.deepEqual(position, { top: 324, left: 16, placement: "below" });
   });
 });
+
+describe("createCache", () => {
+  test("returns what was stored and undefined for a miss", () => {
+    const cache = core.createCache();
+    cache.set("a", { status: "ok" });
+    assert.deepEqual(cache.get("a"), { status: "ok" });
+    assert.equal(cache.get("b"), undefined);
+    assert.equal(cache.size, 1);
+  });
+
+  test("drops the least recently used entry when full", () => {
+    const cache = core.createCache(2);
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.get("a"); // "b" is now the oldest
+    cache.set("c", 3);
+
+    assert.equal(cache.size, 2);
+    assert.equal(cache.get("a"), 1);
+    assert.equal(cache.get("b"), undefined);
+    assert.equal(cache.get("c"), 3);
+  });
+
+  test("overwriting a key does not grow the cache", () => {
+    const cache = core.createCache(2);
+    cache.set("a", 1);
+    cache.set("a", 2);
+    assert.equal(cache.size, 1);
+    assert.equal(cache.get("a"), 2);
+  });
+});
+
+// A fetch stand-in that records its calls and answers through `handler`.
+function fakeFetch(handler) {
+  const calls = [];
+  const fetchImpl = (url, init) => {
+    calls.push({ url, init, word: decodeURIComponent(url.split("/").pop()) });
+    return handler(calls[calls.length - 1]);
+  };
+  fetchImpl.calls = calls;
+  return fetchImpl;
+}
+
+function json(status, body) {
+  return new Response(JSON.stringify(body), { status });
+}
+
+function entryFor(word) {
+  return [
+    {
+      word,
+      meanings: [
+        { partOfSpeech: "noun", definitions: [{ definition: `Meaning of ${word}.` }] },
+      ],
+    },
+  ];
+}
+
+// Never answers; rejects the way fetch does once its signal is aborted.
+function hangUntilAborted({ init }) {
+  return new Promise((resolve, reject) => {
+    init.signal.addEventListener("abort", () => {
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    });
+  });
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe("lookup", () => {
+  test("returns the parsed entry for one word", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    const result = await core.lookup("Sample", { fetchImpl });
+
+    assert.equal(result.status, "ok");
+    assert.equal(result.data.word, "sample");
+    assert.equal(result.data.meanings[0].definition, "Meaning of sample.");
+    assert.equal(result.data.isPhrase, undefined);
+    assert.equal(fetchImpl.calls.length, 1);
+    assert.equal(
+      fetchImpl.calls[0].url,
+      "https://api.dictionaryapi.dev/api/v2/entries/en/sample",
+    );
+  });
+
+  test("sends no cookies and no referrer, and passes an abort signal", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    await core.lookup("sample", { fetchImpl });
+
+    const { init } = fetchImpl.calls[0];
+    assert.equal(init.credentials, "omit");
+    assert.equal(init.referrerPolicy, "no-referrer");
+    assert.ok(init.signal instanceof AbortSignal);
+  });
+
+  test("fetches a word once and answers later lookups from the cache", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    const cache = core.createCache();
+
+    const first = await core.lookup("sample", { fetchImpl, cache });
+    const second = await core.lookup("SAMPLE", { fetchImpl, cache });
+
+    assert.equal(fetchImpl.calls.length, 1);
+    assert.deepEqual(second, first);
+  });
+
+  test("reports not_found for a 404 and caches it", async () => {
+    const fetchImpl = fakeFetch(() => json(404, { title: "No Definitions Found" }));
+    const cache = core.createCache();
+
+    assert.deepEqual(await core.lookup("qwzx", { fetchImpl, cache }), {
+      status: "not_found",
+    });
+    assert.deepEqual(await core.lookup("qwzx", { fetchImpl, cache }), {
+      status: "not_found",
+    });
+    assert.equal(fetchImpl.calls.length, 1);
+  });
+
+  test("reports not_found when a 200 response has nothing usable", async () => {
+    const fetchImpl = fakeFetch(() => json(200, []));
+    assert.deepEqual(await core.lookup("sample", { fetchImpl }), {
+      status: "not_found",
+    });
+  });
+
+  test("reports an HTTP error with its status and does not cache it", async () => {
+    const fetchImpl = fakeFetch(() => json(500, { message: "boom" }));
+    const cache = core.createCache();
+
+    assert.deepEqual(await core.lookup("sample", { fetchImpl, cache }), {
+      status: "error",
+      httpStatus: 500,
+    });
+    await core.lookup("sample", { fetchImpl, cache });
+    assert.equal(fetchImpl.calls.length, 2);
+    assert.equal(cache.size, 0);
+  });
+
+  test("reports an error when the request fails while online", async () => {
+    const fetchImpl = fakeFetch(() => Promise.reject(new TypeError("Failed to fetch")));
+    assert.deepEqual(await core.lookup("sample", { fetchImpl }), { status: "error" });
+  });
+
+  test("reports an error when the body is not JSON", async () => {
+    const fetchImpl = fakeFetch(() => new Response("<html>", { status: 200 }));
+    assert.deepEqual(await core.lookup("sample", { fetchImpl }), { status: "error" });
+  });
+
+  test("reports offline without sending a request", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    const result = await core.lookup("sample", { fetchImpl, isOnline: () => false });
+
+    assert.deepEqual(result, { status: "offline" });
+    assert.equal(fetchImpl.calls.length, 0);
+  });
+
+  test("reports offline when the connection drops during the request", async () => {
+    let online = true;
+    const fetchImpl = fakeFetch(() => {
+      online = false;
+      return Promise.reject(new TypeError("Failed to fetch"));
+    });
+    const result = await core.lookup("sample", { fetchImpl, isOnline: () => online });
+    assert.deepEqual(result, { status: "offline" });
+  });
+
+  test("still answers from the cache while offline", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    const cache = core.createCache();
+    await core.lookup("sample", { fetchImpl, cache });
+
+    const result = await core.lookup("sample", { fetchImpl, cache, isOnline: () => false });
+    assert.equal(result.status, "ok");
+    assert.equal(fetchImpl.calls.length, 1);
+  });
+
+  test("times out and aborts the request", async () => {
+    const fetchImpl = fakeFetch(hangUntilAborted);
+    const result = await core.lookup("sample", { fetchImpl, timeoutMs: 20 });
+
+    assert.deepEqual(result, { status: "timeout" });
+    assert.equal(fetchImpl.calls[0].init.signal.aborted, true);
+  });
+
+  test("does not cache a timeout", async () => {
+    const cache = core.createCache();
+    await core.lookup("sample", { fetchImpl: fakeFetch(hangUntilAborted), cache, timeoutMs: 10 });
+    assert.equal(cache.size, 0);
+  });
+
+  test("leaves the request alone once it has answered in time", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    await core.lookup("sample", { fetchImpl, timeoutMs: 10 });
+    await sleep(30);
+    assert.equal(fetchImpl.calls[0].init.signal.aborted, false);
+  });
+
+  test("is cancelled through the caller's signal", async () => {
+    const fetchImpl = fakeFetch(hangUntilAborted);
+    const controller = new AbortController();
+
+    const pending = core.lookup("sample", { fetchImpl, signal: controller.signal });
+    await sleep(5);
+    controller.abort();
+
+    assert.deepEqual(await pending, { status: "aborted" });
+    assert.equal(fetchImpl.calls[0].init.signal.aborted, true);
+  });
+
+  test("does not send a request when already cancelled", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await core.lookup("sample", { fetchImpl, signal: controller.signal });
+    assert.deepEqual(result, { status: "aborted" });
+    assert.equal(fetchImpl.calls.length, 0);
+  });
+
+  test("looks up the first three words of a longer selection, in order", async () => {
+    const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
+    const result = await core.lookup("One two THREE four", { fetchImpl });
+
+    assert.deepEqual(
+      fetchImpl.calls.map((call) => call.word),
+      ["one", "two", "three"],
+    );
+    assert.equal(result.status, "ok");
+    assert.equal(result.data.word, "One two THREE four");
+    assert.equal(result.data.isPhrase, true);
+    assert.deepEqual(
+      result.data.meanings.map((meaning) => meaning.partOfSpeech),
+      ["one (noun)", "two (noun)", "three (noun)"],
+    );
+  });
+
+  test("shows the words it found when another word has no definition", async () => {
+    const fetchImpl = fakeFetch(({ word }) =>
+      word === "qwzx" ? json(404, {}) : json(200, entryFor(word)),
+    );
+    const result = await core.lookup("ice qwzx", { fetchImpl });
+
+    assert.equal(result.status, "ok");
+    assert.equal(result.data.isPhrase, true);
+    assert.deepEqual(
+      result.data.meanings.map((meaning) => meaning.definition),
+      ["Meaning of ice."],
+    );
+  });
+
+  test("reports not_found when no word of the selection has a definition", async () => {
+    const fetchImpl = fakeFetch(() => json(404, {}));
+    assert.deepEqual(await core.lookup("qwzx zzxq", { fetchImpl }), {
+      status: "not_found",
+    });
+    assert.equal(fetchImpl.calls.length, 2);
+  });
+
+  test("stops at the first failed request", async () => {
+    const fetchImpl = fakeFetch(() => json(503, {}));
+    const result = await core.lookup("one two three", { fetchImpl });
+
+    assert.deepEqual(result, { status: "error", httpStatus: 503 });
+    assert.equal(fetchImpl.calls.length, 1);
+  });
+
+  test("keeps earlier words when a later request fails", async () => {
+    const fetchImpl = fakeFetch(({ word }) =>
+      word === "one" ? json(200, entryFor(word)) : json(503, {}),
+    );
+    const result = await core.lookup("one two three", { fetchImpl });
+
+    assert.equal(result.status, "ok");
+    assert.equal(result.data.meanings.length, 1);
+    assert.equal(fetchImpl.calls.length, 2);
+  });
+
+  test("reports not_found for text with no word in it", async () => {
+    const fetchImpl = fakeFetch(() => json(200, []));
+    assert.deepEqual(await core.lookup("- -", { fetchImpl }), { status: "not_found" });
+    assert.equal(fetchImpl.calls.length, 0);
+  });
+});
+
+describe("describeFailure", () => {
+  test("names the text that was not found", () => {
+    assert.equal(
+      core.describeFailure({ status: "not_found" }, "qwzx"),
+      'No definition found for "qwzx".',
+    );
+  });
+
+  test("gives offline, timeout and error their own messages", () => {
+    const messages = [
+      core.describeFailure({ status: "not_found" }, "x"),
+      core.describeFailure({ status: "offline" }, "x"),
+      core.describeFailure({ status: "timeout" }, "x"),
+      core.describeFailure({ status: "error" }, "x"),
+      core.describeFailure({ status: "error", httpStatus: 429 }, "x"),
+    ];
+
+    assert.equal(new Set(messages).size, messages.length);
+    assert.match(messages[1], /offline/i);
+    assert.match(messages[2], /did not respond in time/);
+    assert.match(messages[3], /Could not reach/);
+    assert.match(messages[4], /HTTP 429/);
+  });
+});
