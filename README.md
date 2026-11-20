@@ -102,7 +102,7 @@ The extension itself needs no tooling. Node.js 22 or newer is only needed to run
 | `npm run check` | Runs `node --check` on every `.js` file and parses every `.json` file |
 | `npm run icons` | Redraws the PNG icons in `icons/` |
 
-GitHub Actions (`.github/workflows/ci.yml`) runs `npm run check` and `npm test` on every push and pull request, on Node 22, 24 and 26.
+GitHub Actions (`.github/workflows/ci.yml`) runs `npm run check` and `npm test` on pushes to `main` and on pull requests, on Node 22, 24 and 26.
 
 ### How the code is split
 

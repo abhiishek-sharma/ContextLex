@@ -43,7 +43,7 @@ No new user-facing features. This release fixes bugs, adds tests and corrects th
 - Icons at 16, 48 and 128 pixels, drawn by `scripts/generate-icons.js`.
 - Tests run with `node --test` (no dependencies) for `core.js`, the manifest and the icons.
 - `npm run check`, a syntax check for every `.js` and `.json` file.
-- A GitHub Actions workflow that runs the check and the tests on push and pull request.
+- A GitHub Actions workflow that runs the check and the tests on pushes to `main` and on pull requests.
 - This changelog.
 
 ## [1.0.0]
