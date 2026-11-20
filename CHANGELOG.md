@@ -8,7 +8,7 @@ No new user-facing features. This release fixes bugs, adds tests and corrects th
 
 ### Fixed
 
-- Text selected in an input (password fields included), a textarea or a contenteditable editor was sent to the dictionary API. Selections there are now ignored.
+- Text selected in a text input, a textarea or a contenteditable editor was sent to the dictionary API. Selections there are now ignored.
 - A second lookup did not cancel the first, so two requests could be running at once. A new lookup, or closing the tooltip, now aborts the request in flight.
 - A request that hung left the tooltip on "Loading..." until the browser gave up on it. A lookup now gives up after 8 seconds.
 - Every failure read "Definition not found". No definition, being offline, a timeout and a failed request now each have their own message.
