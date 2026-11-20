@@ -64,6 +64,15 @@ describe("manifest.json", () => {
   });
 });
 
+describe("CHANGELOG.md", () => {
+  test("has an entry for the version in the manifest", () => {
+    assert.ok(
+      read("CHANGELOG.md").includes(`## [${manifest.version}]`),
+      `no entry for ${manifest.version}`,
+    );
+  });
+});
+
 describe("content scripts", () => {
   test("core.js is loaded before content.js", () => {
     assert.deepEqual(scripts, ["core.js", "content.js"]);
