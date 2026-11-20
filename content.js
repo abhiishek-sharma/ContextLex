@@ -162,6 +162,10 @@
 
   // Main handler for text selection
   async function handleSelection(origin) {
+    // The tooltip is appended to <body>. Some documents have none, for
+    // example an SVG file opened in a tab.
+    if (!document.body) return;
+
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
 
