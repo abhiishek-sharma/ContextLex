@@ -73,6 +73,23 @@ describe("CHANGELOG.md", () => {
   });
 });
 
+describe("styles.css", () => {
+  test("starts every selector with #contextlex-tooltip", () => {
+    // A bare class selector loses to the `#contextlex-tooltip *` reset,
+    // so its margins and padding would be silently dropped.
+    const css = read("styles.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    const selectors = [...css.matchAll(/([^{}]+)\{/g)]
+      .map((match) => match[1].trim())
+      .filter((selector) => !selector.startsWith("@"))
+      .flatMap((selector) => selector.split(",").map((part) => part.trim()));
+
+    assert.ok(selectors.length > 10, "no selectors found");
+    for (const selector of selectors) {
+      assert.match(selector, /^#contextlex-tooltip(\s|$)/, selector);
+    }
+  });
+});
+
 describe("content scripts", () => {
   test("core.js is loaded before content.js", () => {
     assert.deepEqual(scripts, ["core.js", "content.js"]);

@@ -20,20 +20,23 @@
     box-sizing: border-box;
 }
 
+/* Undo what a page's own CSS may set on the inner elements. The rules
+   below start with #contextlex-tooltip so they are more specific than
+   this reset; a bare class selector would lose to it. */
 #contextlex-tooltip * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
 
-.contextlex-word {
+#contextlex-tooltip .contextlex-word {
     font-weight: 600;
     font-size: 15px;
     color: #111111;
     margin-bottom: 8px;
 }
 
-.contextlex-phonetic {
+#contextlex-tooltip .contextlex-phonetic {
     font-size: 12px;
     font-weight: 400;
     color: #666666;
@@ -41,7 +44,7 @@
     margin-left: 6px;
 }
 
-.contextlex-phrase-tag {
+#contextlex-tooltip .contextlex-phrase-tag {
     display: inline-block;
     font-size: 10px;
     font-weight: 500;
@@ -55,23 +58,23 @@
     vertical-align: middle;
 }
 
-.contextlex-meanings {
+#contextlex-tooltip .contextlex-meanings {
     display: block;
 }
 
-.contextlex-meaning {
+#contextlex-tooltip .contextlex-meaning {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid #eeeeee;
 }
 
-.contextlex-meaning:first-child {
+#contextlex-tooltip .contextlex-meaning:first-child {
     margin-top: 0;
     padding-top: 0;
     border-top: none;
 }
 
-.contextlex-pos {
+#contextlex-tooltip .contextlex-pos {
     display: inline-block;
     font-size: 11px;
     font-weight: 600;
@@ -82,14 +85,14 @@
     margin-bottom: 4px;
 }
 
-.contextlex-def {
+#contextlex-tooltip .contextlex-def {
     display: block;
     font-size: 13px;
     color: #333333;
     margin-top: 4px;
 }
 
-.contextlex-example {
+#contextlex-tooltip .contextlex-example {
     display: block;
     font-size: 12px;
     color: #777777;
@@ -99,12 +102,12 @@
     border-left: 2px solid #e0e0e0;
 }
 
-.contextlex-loading {
+#contextlex-tooltip .contextlex-loading {
     color: #666666;
     font-size: 13px;
 }
 
-.contextlex-error {
+#contextlex-tooltip .contextlex-error {
     color: #666666;
     font-size: 13px;
     font-style: italic;
@@ -119,38 +122,38 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
 
-    .contextlex-word {
+    #contextlex-tooltip .contextlex-word {
         color: #f0f0f0;
     }
 
-    .contextlex-phonetic {
+    #contextlex-tooltip .contextlex-phonetic {
         color: #a0a0a0;
     }
 
-    .contextlex-meaning {
+    #contextlex-tooltip .contextlex-meaning {
         border-top-color: #404040;
     }
 
-    .contextlex-pos {
+    #contextlex-tooltip .contextlex-pos {
         color: #c0c0c0;
         background: #3a3a3a;
     }
 
-    .contextlex-phrase-tag {
+    #contextlex-tooltip .contextlex-phrase-tag {
         background: linear-gradient(135deg, #5a6edb 0%, #6b4095 100%);
     }
 
-    .contextlex-def {
+    #contextlex-tooltip .contextlex-def {
         color: #d0d0d0;
     }
 
-    .contextlex-example {
+    #contextlex-tooltip .contextlex-example {
         color: #909090;
         border-left-color: #505050;
     }
 
-    .contextlex-loading,
-    .contextlex-error {
+    #contextlex-tooltip .contextlex-loading,
+    #contextlex-tooltip .contextlex-error {
         color: #a0a0a0;
     }
 }

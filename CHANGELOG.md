@@ -21,6 +21,7 @@ No new user-facing features. This release fixes bugs, adds tests and corrects th
 - If the page removed the tooltip element, no tooltip appeared again until reload.
 - A selection in a document without a `<body>` (an SVG file opened in a tab, for example) threw an error.
 - `text-transform: italic` in the stylesheet was not valid CSS and has been removed.
+- The margins and padding inside the tooltip were never applied: the `#contextlex-tooltip *` reset was more specific than the class rules that set them. Those rules now start with `#contextlex-tooltip`.
 
 ### Changed
 
