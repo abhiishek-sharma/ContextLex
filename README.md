@@ -107,7 +107,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs `npm run check` and `npm test` 
 
 ### How the code is split
 
-- `core.js` holds the logic that needs no DOM: cleaning and validating the selected text, parsing the API response, the lookup itself (cache, timeout, cancellation, failure messages) and the positioning maths. Chrome loads it as the first content script. The tests load the same file with `require()`.
+- `core.js` holds the logic that needs no DOM: cleaning and validating the selected text, deciding whether a selection belongs to an editable field, parsing the API response, the lookup itself (cache, timeout, cancellation, failure messages) and the positioning maths. Chrome loads it as the first content script. The tests load the same file with `require()`, and once more together with `content.js` in a `node:vm` context.
 - `content.js` connects that logic to the page: selection events, building the tooltip with DOM nodes (`textContent`, never HTML strings) and dismissing it.
 
 ### What the tests cover
