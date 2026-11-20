@@ -16,10 +16,13 @@
   let currentText = null;
   let activeLookup = null; // AbortController of the lookup in flight
   let isMouseDown = false;
+  let mouseTimer = null; // pending selection check after a mouse event
+  let selectionTimer = null; // pending selection check after selectionchange
 
   // Create tooltip element
   function createTooltip() {
-    if (tooltip) return tooltip;
+    // Start again if the page removed our element
+    if (tooltip && tooltip.isConnected) return tooltip;
 
     tooltip = document.createElement("div");
     tooltip.id = "contextlex-tooltip";
@@ -39,9 +42,13 @@
   // Remove tooltip
   function hideTooltip() {
     cancelLookup();
-    if (tooltip && tooltip.parentNode) {
+    if (tooltip) {
       tooltip.remove();
       tooltip = null;
+
+      // Selection checks still waiting belong to what was just dismissed
+      clearTimeout(mouseTimer);
+      clearTimeout(selectionTimer);
     }
     currentText = null;
   }
@@ -208,7 +215,8 @@
 
     // Small delay to let selection complete
     const origin = eventOrigin(e);
-    setTimeout(() => {
+    clearTimeout(mouseTimer);
+    mouseTimer = setTimeout(() => {
       handleSelection(origin);
     }, 50);
   });
@@ -220,18 +228,17 @@
 
     // Small delay to let selection complete
     const origin = eventOrigin(e);
-    setTimeout(() => {
+    clearTimeout(mouseTimer);
+    mouseTimer = setTimeout(() => {
       handleSelection(origin);
     }, 10);
   });
 
   // Touch device support - detect selection changes
-  let selectionTimeout = null;
   document.addEventListener("selectionchange", () => {
-    // Only process on touch devices or when there's an active selection
-    if (selectionTimeout) clearTimeout(selectionTimeout);
+    clearTimeout(selectionTimer);
 
-    selectionTimeout = setTimeout(() => {
+    selectionTimer = setTimeout(() => {
       // Don't trigger during mouse drag
       if (isMouseDown) return;
 
@@ -242,7 +249,8 @@
   // Dismiss tooltip on click outside
   document.addEventListener("click", (e) => {
     // Don't dismiss if clicking to make a selection
-    if (window.getSelection().toString().trim()) return;
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim()) return;
 
     if (tooltip && !tooltip.contains(e.target)) {
       hideTooltip();
