@@ -88,6 +88,7 @@ This has not been tested with a screen reader yet.
 - A drag selection that includes punctuation or digits (for example `word,`) is ignored.
 - The check for form fields looks through open shadow roots only. A field inside a closed shadow root is not recognised.
 - Only scrolling the page closes the tooltip. Scrolling inside a nested scrollable area does not, and the tooltip does not follow the text if the layout changes (for example when the window is resized).
+- The tooltip is placed with `position: absolute` in page coordinates. On a site that gives `<body>` a CSS `position` (such as `relative`) and moves it away from the top-left corner of the page, for example with a margin, the tooltip is shifted by that same distance.
 - The tooltip is an element in the page, styled by a normal stylesheet, so a site's own CSS can change how it looks.
 - The Free Dictionary API is a free service with rate limits. When it refuses or fails a request, the tooltip shows an error message with the HTTP status.
 - Not checked on sites with a strict Content Security Policy. If a page blocks the request, the tooltip shows the "Could not reach the dictionary" message.
