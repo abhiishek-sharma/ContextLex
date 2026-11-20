@@ -71,10 +71,9 @@ describe("isValidText", () => {
     assert.equal(core.isValidText("line\nbreak"), false);
   });
 
-  test("enforces the length limit", () => {
-    const limit = core.MAX_SELECTION_LENGTH;
-    assert.equal(core.isValidText("a".repeat(limit)), true);
-    assert.equal(core.isValidText("a".repeat(limit + 1)), false);
+  test("accepts up to 100 characters, as the README says", () => {
+    assert.equal(core.isValidText("a".repeat(100)), true);
+    assert.equal(core.isValidText("a".repeat(101)), false);
   });
 });
 
@@ -442,6 +441,16 @@ describe("createCache", () => {
     assert.equal(cache.size, 1);
   });
 
+  test("keeps 100 entries by default, as the README says", () => {
+    const cache = core.createCache();
+    for (let i = 1; i <= 101; i++) cache.set(`word${i}`, i);
+
+    assert.equal(cache.size, 100);
+    assert.equal(cache.get("word1"), undefined);
+    assert.equal(cache.get("word2"), 2);
+    assert.equal(cache.get("word101"), 101);
+  });
+
   test("drops the least recently used entry when full", () => {
     const cache = core.createCache(2);
     cache.set("a", 1);
@@ -633,6 +642,19 @@ describe("lookup", () => {
     assert.equal(fetchImpl.calls[0].init.signal.aborted, true);
   });
 
+  test("gives up after 8 seconds by default, as the README says", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const fetchImpl = fakeFetch(hangUntilAborted);
+    const pending = core.lookup("sample", { fetchImpl });
+
+    t.mock.timers.tick(7999);
+    assert.equal(fetchImpl.calls[0].init.signal.aborted, false);
+
+    t.mock.timers.tick(1);
+    assert.equal(fetchImpl.calls[0].init.signal.aborted, true);
+    assert.deepEqual(await pending, { status: "timeout" });
+  });
+
   test("does not cache a timeout", async () => {
     const cache = core.createCache();
     await core.lookup("sample", { fetchImpl: fakeFetch(hangUntilAborted), cache, timeoutMs: 10 });
@@ -656,6 +678,32 @@ describe("lookup", () => {
 
     assert.deepEqual(await pending, { status: "aborted" });
     assert.equal(fetchImpl.calls[0].init.signal.aborted, true);
+  });
+
+  test("stops a multi-word lookup cancelled between words", async () => {
+    const fetchImpl = fakeFetch((call) =>
+      call.word === "one" ? json(200, entryFor("one")) : hangUntilAborted(call),
+    );
+    const cache = core.createCache();
+    const controller = new AbortController();
+
+    const pending = core.lookup("one two three", {
+      fetchImpl,
+      cache,
+      signal: controller.signal,
+    });
+    // Wait until "one" has been answered and "two" is in flight.
+    for (let i = 0; i < 200 && fetchImpl.calls.length < 2; i++) await sleep(1);
+    assert.deepEqual(fetchImpl.calls.map((call) => call.word), ["one", "two"]);
+
+    controller.abort();
+
+    assert.deepEqual(await pending, { status: "aborted" });
+    assert.equal(fetchImpl.calls[1].init.signal.aborted, true);
+    // "three" is never requested; "one" stays cached, "two" is not cached.
+    assert.equal(fetchImpl.calls.length, 2);
+    assert.equal(cache.get("one").status, "ok");
+    assert.equal(cache.get("two"), undefined);
   });
 
   test("does not send a request when already cancelled", async () => {
