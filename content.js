@@ -65,12 +65,17 @@
 
     const rect = range.getBoundingClientRect();
 
+    // The scrolling element reports the size of the visible area: <html>
+    // in standards mode, <body> in quirks mode (where <html> reports the
+    // height of the whole document instead)
+    const viewport = document.scrollingElement || document.documentElement;
+
     const position = core.computePosition({
       rect,
       tooltip: { width: tooltip.offsetWidth, height: tooltip.offsetHeight },
       viewport: {
-        width: document.documentElement.clientWidth,
-        height: document.documentElement.clientHeight,
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
       },
       scroll: { x: window.scrollX, y: window.scrollY },
     });

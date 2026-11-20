@@ -14,6 +14,7 @@ No new user-facing features. This release fixes bugs, adds tests and corrects th
 - Every failure read "Definition not found". No definition, being offline, a timeout and a failed request now each have their own message.
 - The tooltip was misplaced on horizontally scrolled pages and could land above the visible area when it flipped above the selection.
 - Near the right edge of the window, or on a page scrolled sideways, the tooltip could shrink to a narrow, tall column touching the window edge, because its width depended on its own position. It is now sized to its content, up to 320px, and keeps its 8px margin.
+- On pages in quirks mode (no doctype) the tooltip never moved above a word near the bottom of the window and ended up below the visible area.
 - The phonetic spelling was missing when the response had no top-level `phonetic` and its first `phonetics` item had no text (the response for "hello" is one example).
 - Words with a curly apostrophe (don’t), a soft hyphen or a zero-width character were ignored.
 - Selecting only a hyphen or an apostrophe started a lookup.
