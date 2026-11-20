@@ -13,7 +13,8 @@ const zlib = require("node:zlib");
 const SIZES = [16, 48, 128];
 const OUT_DIR = path.join(__dirname, "..", "icons");
 
-// Same two colours as the "phrase" tag in styles.css.
+// Close to the gradient of the "phrase" tag in styles.css. The tag starts
+// darker so its white text has enough contrast; the icon has no text.
 const GRADIENT_FROM = [0x66, 0x7e, 0xea];
 const GRADIENT_TO = [0x76, 0x4b, 0xa2];
 const WHITE = [255, 255, 255];

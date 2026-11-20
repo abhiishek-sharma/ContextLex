@@ -33,6 +33,7 @@ No new user-facing features. This release fixes bugs, adds tests and corrects th
 - The tooltip is a polite live region (`role="status"`) marked `lang="en"`. It had `role="tooltip"` with nothing referring to it.
 - Under `prefers-reduced-motion: reduce`, transitions and animations a page's CSS might apply to the tooltip are blocked.
 - The tooltip's maximum width respects narrow viewports.
+- Example sentences and the "phrase" label have a text contrast of at least 4.5:1 against their background, in both themes. The colours moved by a few shades: in the light theme the example text was at 4.48:1 and the label at 3.66:1.
 - Logic that needs no DOM moved from `content.js` to `core.js`, which the manifest loads first.
 - Manifest description rewritten; version is 1.1.0.
 - README corrected: it said the extension needs no permissions without mentioning that the content script runs on all sites, said phrases are ignored when the first three words of a selection are looked up, and did not say that every qualifying selection (not only a double-click) is sent to the API.
