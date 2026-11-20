@@ -26,7 +26,13 @@
 
     tooltip = document.createElement("div");
     tooltip.id = "contextlex-tooltip";
-    tooltip.setAttribute("role", "tooltip");
+    // A polite live region: a screen reader reads the definition when it
+    // arrives, without focus moving. The definitions are in English
+    // whatever the language of the page.
+    tooltip.setAttribute("role", "status");
+    tooltip.setAttribute("aria-live", "polite");
+    tooltip.setAttribute("aria-atomic", "true");
+    tooltip.setAttribute("lang", "en");
     document.body.appendChild(tooltip);
     return tooltip;
   }
@@ -147,6 +153,7 @@
   // Show loading state
   function showLoading(range) {
     createTooltip();
+    tooltip.setAttribute("aria-busy", "true");
     showMessage("contextlex-loading", "Loading...");
     tooltip.style.opacity = "1";
     tooltip.style.visibility = "visible";
@@ -198,6 +205,7 @@
     } else {
       showMessage("contextlex-error", core.describeFailure(result, text));
     }
+    if (tooltip) tooltip.setAttribute("aria-busy", "false");
     positionTooltip(range);
   }
 
