@@ -88,50 +88,59 @@
     return core.combinePhrase(phrase, entries);
   }
 
+  // Build an element whose text is set with textContent, so nothing that
+  // comes back from the API is ever parsed as HTML.
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    node.className = className;
+    if (text) node.textContent = text;
+    return node;
+  }
+
+  function showMessage(className, text) {
+    if (!tooltip) return;
+    tooltip.replaceChildren(element("div", className, text));
+  }
+
   // Render tooltip content
   function renderTooltip(data) {
     if (!tooltip) return;
 
     if (!data) {
-      tooltip.innerHTML = `<div class="contextlex-error">Definition not found</div>`;
+      showMessage("contextlex-error", "Definition not found");
       return;
     }
 
-    let html = `<div class="contextlex-word">${escapeHtml(data.word)}`;
+    const heading = element("div", "contextlex-word", data.word);
     if (data.phonetic) {
-      html += ` <span class="contextlex-phonetic">${escapeHtml(data.phonetic)}</span>`;
+      heading.append(" ", element("span", "contextlex-phonetic", data.phonetic));
     }
     if (data.isPhrase) {
-      html += ` <span class="contextlex-phrase-tag">phrase</span>`;
+      heading.append(" ", element("span", "contextlex-phrase-tag", "phrase"));
     }
-    html += `</div>`;
 
-    html += `<div class="contextlex-meanings">`;
+    const meanings = element("div", "contextlex-meanings");
     for (const meaning of data.meanings) {
-      html += `<div class="contextlex-meaning">`;
-      html += `<span class="contextlex-pos">${escapeHtml(meaning.partOfSpeech)}</span>`;
-      html += `<span class="contextlex-def">${escapeHtml(meaning.definition)}</span>`;
-      if (meaning.example) {
-        html += `<span class="contextlex-example">"${escapeHtml(meaning.example)}"</span>`;
+      const item = element("div", "contextlex-meaning");
+      if (meaning.partOfSpeech) {
+        item.append(element("span", "contextlex-pos", meaning.partOfSpeech));
       }
-      html += `</div>`;
+      item.append(element("span", "contextlex-def", meaning.definition));
+      if (meaning.example) {
+        item.append(
+          element("span", "contextlex-example", `"${meaning.example}"`),
+        );
+      }
+      meanings.append(item);
     }
-    html += `</div>`;
 
-    tooltip.innerHTML = html;
-  }
-
-  // Escape HTML to prevent XSS
-  function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+    tooltip.replaceChildren(heading, meanings);
   }
 
   // Show loading state
   function showLoading(selection) {
     createTooltip();
-    tooltip.innerHTML = `<div class="contextlex-loading">Loading...</div>`;
+    showMessage("contextlex-loading", "Loading...");
     tooltip.style.opacity = "1";
     tooltip.style.visibility = "visible";
     positionTooltip(selection);
