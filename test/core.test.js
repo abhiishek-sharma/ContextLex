@@ -742,6 +742,38 @@ describe("describeFailure", () => {
   });
 });
 
+describe("isSelectingInFocusedField", () => {
+  function field(tagName, selectionStart, selectionEnd, extra = {}) {
+    return { nodeType: 1, tagName, parentNode: null, selectionStart, selectionEnd, ...extra };
+  }
+
+  test("is true for a text field with selected text", () => {
+    assert.equal(core.isSelectingInFocusedField(field("INPUT", 0, 6)), true);
+    assert.equal(core.isSelectingInFocusedField(field("TEXTAREA", 2, 9)), true);
+  });
+
+  test("is false for a text field with only the caret in it", () => {
+    assert.equal(core.isSelectingInFocusedField(field("INPUT", 3, 3)), false);
+    assert.equal(core.isSelectingInFocusedField(field("TEXTAREA", 0, 0)), false);
+  });
+
+  test("is true for a field that does not report its selection", () => {
+    // Chrome returns null for email and number inputs.
+    assert.equal(core.isSelectingInFocusedField(field("INPUT", null, null, { type: "email" })), true);
+  });
+
+  test("is true for focused contenteditable content", () => {
+    const editor = { nodeType: 1, tagName: "DIV", parentNode: null, isContentEditable: true };
+    assert.equal(core.isSelectingInFocusedField(editor), true);
+  });
+
+  test("is false for other focused elements and for no element", () => {
+    const body = { nodeType: 1, tagName: "BODY", parentNode: null, isContentEditable: false };
+    assert.equal(core.isSelectingInFocusedField(body), false);
+    assert.equal(core.isSelectingInFocusedField(null), false);
+  });
+});
+
 describe("isEditableNode", () => {
   // Stand-ins with the few DOM properties the function reads.
   function el(tagName, parentNode = null, extra = {}) {

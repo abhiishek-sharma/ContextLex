@@ -100,6 +100,23 @@
     return false;
   }
 
+  // True when the focused element holds the selection the user is making:
+  // a text field with selected text in it, or contenteditable content. A
+  // field with only the caret in it does not count, so page text can still
+  // be looked up while a search box keeps focus. Field types that do not
+  // report their selection (email and number return null) are counted.
+  function isSelectingInFocusedField(active) {
+    if (!active || active.nodeType !== 1) return false;
+
+    const tag = String(active.tagName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      const { selectionStart, selectionEnd } = active;
+      if (typeof selectionStart !== "number") return true;
+      return selectionStart !== selectionEnd;
+    }
+    return isEditableNode(active);
+  }
+
   // ---------------------------------------------------------------------
   // Response parsing
   // ---------------------------------------------------------------------
@@ -399,6 +416,7 @@
     isSingleWord,
     buildApiUrl,
     isEditableNode,
+    isSelectingInFocusedField,
     parseEntry,
     combinePhrase,
     computePosition,

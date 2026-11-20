@@ -101,14 +101,15 @@
     return path[0] || event.target;
   }
 
-  // True when the selection belongs to something the user is typing in
+  // True when the selection belongs to something the user is typing in.
+  // Chrome reports a selection inside an <input> or <textarea> with the
+  // field's parent as anchorNode, so the focused field is checked as well.
   function isEditableContext(selection, origin) {
-    return [
-      origin,
-      deepActiveElement(),
-      selection.anchorNode,
-      selection.focusNode,
-    ].some(core.isEditableNode);
+    return (
+      [origin, selection.anchorNode, selection.focusNode].some(
+        core.isEditableNode,
+      ) || core.isSelectingInFocusedField(deepActiveElement())
+    );
   }
 
   // Build an element whose text is set with textContent, so nothing that

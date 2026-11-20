@@ -14,7 +14,7 @@ It has no settings, no background script, no runtime dependencies and no build s
 - A word that has been answered is not requested again on the same page. Answers (definitions and "not found") are kept in memory, up to 100 words, until the page is reloaded or closed.
 - A lookup is given 8 seconds. Starting a new lookup or closing the tooltip cancels the request that is still running.
 - "No definition found", being offline, a timeout and a failed request each show their own message.
-- Text you select inside an input (password fields included), a textarea or a contenteditable editor is not looked up.
+- Text you select inside an input, a textarea or a contenteditable editor is not looked up.
 
 ## Installation
 
