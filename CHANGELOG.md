@@ -20,7 +20,7 @@ No new user-facing features. This release fixes bugs, adds tests and corrects th
 - Selecting only a hyphen or an apostrophe started a lookup.
 - Pressing Escape or scrolling within 400 ms of a double-click closed the tooltip, which then opened again.
 - A word selected inside the tooltip started a new lookup after 400 ms.
-- If the page removed the tooltip element, no tooltip appeared again until reload.
+- If the page removed the tooltip element, no tooltip appeared again until reload, and selecting the same word again did nothing.
 - A selection in a document without a `<body>` (an SVG file opened in a tab, for example) threw an error.
 - `text-transform: italic` in the stylesheet was not valid CSS and has been removed.
 - The margins and padding inside the tooltip were never applied: the `#contextlex-tooltip *` reset was more specific than the class rules that set them. Those rules now start with `#contextlex-tooltip`.

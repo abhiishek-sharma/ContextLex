@@ -171,6 +171,10 @@
     // example an SVG file opened in a tab.
     if (!document.body) return;
 
+    // If the page removed the tooltip, also forget the word it showed, so
+    // selecting that word again opens a new tooltip
+    if (tooltip && !tooltip.isConnected) hideTooltip();
+
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
 
