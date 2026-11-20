@@ -345,6 +345,9 @@
           signal: controller.signal,
           credentials: "omit",
           referrerPolicy: "no-referrer",
+          // Keep answers out of the browser's HTTP cache: the in-memory
+          // cache above is the only one, and it ends with the page.
+          cache: "no-store",
         });
 
         if (response.status === 404) {

@@ -29,7 +29,7 @@ No new user-facing features. This release fixes bugs, adds tests and corrects th
 
 - The tooltip is built with DOM nodes and `textContent`. API text was escaped by hand and assigned through `innerHTML` before.
 - The same word is requested once per page: answers are kept in a 100-entry in-memory cache.
-- Requests are sent with `credentials: "omit"` and `referrerPolicy: "no-referrer"`.
+- Requests are sent with `credentials: "omit"`, `referrerPolicy: "no-referrer"` and `cache: "no-store"`.
 - The tooltip is a polite live region (`role="status"`) marked `lang="en"`. It had `role="tooltip"` with nothing referring to it.
 - Under `prefers-reduced-motion: reduce`, transitions and animations a page's CSS might apply to the tooltip are blocked.
 - The tooltip's maximum width respects narrow viewports.

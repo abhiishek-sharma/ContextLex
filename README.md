@@ -52,7 +52,7 @@ ContextLex sends the words you select to a third-party service, so here is exact
 - **When:** every time a selection starts a lookup (see [Usage](#usage)), not only on double-click. Selecting a name to copy it, for example, sends that name. Words answered from the in-page cache are not sent again.
 - **What is not sent by the extension:** the page address, the surrounding text, cookies or any identifier. Requests are made with `credentials: "omit"` and `referrerPolicy: "no-referrer"`.
 - **What the browser adds anyway:** the request is made from the page you are on, so like any request from a web page it carries your IP address and the browser's standard headers. One of them is `Origin`, which names the site you are reading (its domain, not the page address).
-- **What is stored:** nothing. The cache lives in the memory of the page and disappears with it. The extension uses no storage API, has no background script and contains no analytics.
+- **What is stored:** nothing that outlives the page. The extension's cache lives in the memory of the page and disappears with it, and requests are made with `cache: "no-store"`, so the browser's HTTP cache does not keep the answers either. The extension uses no storage API, has no background script and contains no analytics.
 
 ContextLex has no control over what dictionaryapi.dev logs.
 

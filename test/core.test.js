@@ -517,13 +517,14 @@ describe("lookup", () => {
     );
   });
 
-  test("sends no cookies and no referrer, and passes an abort signal", async () => {
+  test("sends no cookies and no referrer, bypasses the HTTP cache and passes an abort signal", async () => {
     const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
     await core.lookup("sample", { fetchImpl });
 
     const { init } = fetchImpl.calls[0];
     assert.equal(init.credentials, "omit");
     assert.equal(init.referrerPolicy, "no-referrer");
+    assert.equal(init.cache, "no-store");
     assert.ok(init.signal instanceof AbortSignal);
   });
 
