@@ -3,6 +3,9 @@
 #contextlex-tooltip {
     position: absolute;
     z-index: 2147483647;
+    /* Size to the content, not to the room left of `left`, so the width
+       does not depend on where the tooltip was placed before. */
+    width: max-content;
     max-width: min(320px, calc(100vw - 16px));
     min-width: 180px;
     padding: 12px 14px;
