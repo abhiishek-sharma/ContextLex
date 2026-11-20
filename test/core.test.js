@@ -2,6 +2,7 @@
 
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
+const { getEventListeners } = require("node:events");
 
 const core = require("../core.js");
 
@@ -697,6 +698,27 @@ describe("lookup", () => {
     assert.equal(fetchImpl.calls.length, 2);
     assert.equal(cache.get("one").status, "ok");
     assert.equal(cache.get("two"), undefined);
+  });
+
+  test("leaves no listener on the caller's signal once it is done", async () => {
+    // A caller may pass one long-lived signal to many lookups.
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const listeners = () => getEventListeners(signal, "abort").length;
+
+    const pending = core.lookup("sample", {
+      fetchImpl: fakeFetch(hangUntilAborted),
+      signal,
+      timeoutMs: 10,
+    });
+    assert.equal(listeners(), 1, "listening while the lookup runs");
+    assert.deepEqual(await pending, { status: "timeout" });
+    assert.equal(listeners(), 0, "after a timeout");
+
+    await core.lookup("sample", { fetchImpl: fakeFetch(({ word }) => json(200, entryFor(word))), signal });
+    await core.lookup("qwzx", { fetchImpl: fakeFetch(() => json(404, {})), signal });
+    await core.lookup("sample", { fetchImpl: fakeFetch(() => json(503, {})), signal });
+    assert.equal(listeners(), 0, "after a definition, a not found and an HTTP error");
   });
 
   test("does not send a request when already cancelled", async () => {
