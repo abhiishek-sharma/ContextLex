@@ -100,13 +100,6 @@ describe("toApiWord and splitWords", () => {
     assert.deepEqual(core.splitWords("cats - dogs"), ["cats", "dogs"]);
     assert.deepEqual(core.splitWords(""), []);
   });
-
-  test("isSingleWord counts the words that can be looked up", () => {
-    assert.equal(core.isSingleWord("word"), true);
-    assert.equal(core.isSingleWord("word -"), true);
-    assert.equal(core.isSingleWord("two words"), false);
-    assert.equal(core.isSingleWord(""), false);
-  });
 });
 
 describe("buildApiUrl", () => {

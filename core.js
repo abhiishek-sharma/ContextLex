@@ -73,10 +73,6 @@
       .filter((word) => word.length > 0);
   }
 
-  function isSingleWord(text) {
-    return splitWords(text).length === 1;
-  }
-
   function buildApiUrl(apiWord) {
     return API_BASE + encodeURIComponent(apiWord);
   }
@@ -425,7 +421,6 @@
     isValidText,
     toApiWord,
     splitWords,
-    isSingleWord,
     buildApiUrl,
     isEditableNode,
     isSelectingInFocusedField,
