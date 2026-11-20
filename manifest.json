@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
   "name": "ContextLex",
-  "version": "1.0.0",
-  "description": "Instantly see word definitions by double-clicking any word on any webpage.",
+  "version": "1.1.0",
+  "description": "Double-click or select a word on a web page to see its definition in a tooltip. Definitions come from the Free Dictionary API.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
