@@ -82,6 +82,25 @@
   }
 
   // ---------------------------------------------------------------------
+  // Editable content
+  // ---------------------------------------------------------------------
+
+  // True when a DOM node is, or sits inside, something the user types in:
+  // an <input> of any type (password fields included), a <textarea> or
+  // contenteditable content. It only reads plain properties, so the tests
+  // can pass in simple objects.
+  function isEditableNode(node) {
+    for (let current = node; current; current = current.parentNode) {
+      if (current.nodeType !== 1) continue;
+
+      const tag = String(current.tagName || "").toUpperCase();
+      if (tag === "INPUT" || tag === "TEXTAREA") return true;
+      if (current.isContentEditable === true) return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------
   // Response parsing
   // ---------------------------------------------------------------------
 
@@ -379,6 +398,7 @@
     splitWords,
     isSingleWord,
     buildApiUrl,
+    isEditableNode,
     parseEntry,
     combinePhrase,
     computePosition,

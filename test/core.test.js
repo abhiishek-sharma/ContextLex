@@ -741,3 +741,44 @@ describe("describeFailure", () => {
     assert.match(messages[4], /HTTP 429/);
   });
 });
+
+describe("isEditableNode", () => {
+  // Stand-ins with the few DOM properties the function reads.
+  function el(tagName, parentNode = null, extra = {}) {
+    return { nodeType: 1, tagName, parentNode, isContentEditable: false, ...extra };
+  }
+  function textIn(parentNode) {
+    return { nodeType: 3, parentNode };
+  }
+
+  test("is true for inputs of any type and for textareas", () => {
+    assert.equal(core.isEditableNode(el("INPUT", null, { type: "text" })), true);
+    assert.equal(core.isEditableNode(el("INPUT", null, { type: "password" })), true);
+    assert.equal(core.isEditableNode(el("TEXTAREA")), true);
+    assert.equal(core.isEditableNode(el("textarea")), true);
+  });
+
+  test("is true for contenteditable elements and what is inside them", () => {
+    const editor = el("DIV", el("BODY"), { isContentEditable: true });
+    const paragraph = el("P", editor, { isContentEditable: true });
+
+    assert.equal(core.isEditableNode(editor), true);
+    assert.equal(core.isEditableNode(paragraph), true);
+    assert.equal(core.isEditableNode(textIn(paragraph)), true);
+    // Still found through the ancestors if the flag is only on the host.
+    assert.equal(core.isEditableNode(textIn(el("SPAN", editor))), true);
+  });
+
+  test("is false for ordinary page content", () => {
+    const paragraph = el("P", el("ARTICLE", el("BODY", el("HTML"))));
+
+    assert.equal(core.isEditableNode(paragraph), false);
+    assert.equal(core.isEditableNode(textIn(paragraph)), false);
+    assert.equal(core.isEditableNode(el("BUTTON")), false);
+  });
+
+  test("is false when there is no node", () => {
+    assert.equal(core.isEditableNode(null), false);
+    assert.equal(core.isEditableNode(undefined), false);
+  });
+});

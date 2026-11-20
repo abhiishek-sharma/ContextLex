@@ -66,6 +66,33 @@
     tooltip.style.left = `${position.left}px`;
   }
 
+  // The focused element, looking through open shadow roots
+  function deepActiveElement() {
+    let active = document.activeElement;
+    while (active && active.shadowRoot && active.shadowRoot.activeElement) {
+      active = active.shadowRoot.activeElement;
+    }
+    return active;
+  }
+
+  // The node an event started on, even inside an open shadow root. This
+  // has to be read while the event is being dispatched.
+  function eventOrigin(event) {
+    const path =
+      typeof event.composedPath === "function" ? event.composedPath() : [];
+    return path[0] || event.target;
+  }
+
+  // True when the selection belongs to something the user is typing in
+  function isEditableContext(selection, origin) {
+    return [
+      origin,
+      deepActiveElement(),
+      selection.anchorNode,
+      selection.focusNode,
+    ].some(core.isEditableNode);
+  }
+
   // Build an element whose text is set with textContent, so nothing that
   // comes back from the API is ever parsed as HTML.
   function element(tag, className, text) {
@@ -120,9 +147,16 @@
   }
 
   // Main handler for text selection
-  async function handleSelection() {
+  async function handleSelection(origin) {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
+
+    // Never look up what the user is typing: inputs (password fields
+    // included), textareas and contenteditable content
+    if (isEditableContext(selection, origin)) return;
+
+    // Text selected inside the tooltip is for copying, not for a lookup
+    if (tooltip && tooltip.contains(selection.anchorNode)) return;
 
     const text = core.cleanSelection(selection.toString());
 
@@ -173,8 +207,9 @@
     if (tooltip && tooltip.contains(e.target)) return;
 
     // Small delay to let selection complete
+    const origin = eventOrigin(e);
     setTimeout(() => {
-      handleSelection();
+      handleSelection(origin);
     }, 50);
   });
 
@@ -184,7 +219,10 @@
     if (tooltip && tooltip.contains(e.target)) return;
 
     // Small delay to let selection complete
-    setTimeout(handleSelection, 10);
+    const origin = eventOrigin(e);
+    setTimeout(() => {
+      handleSelection(origin);
+    }, 10);
   });
 
   // Touch device support - detect selection changes
@@ -197,7 +235,7 @@
       // Don't trigger during mouse drag
       if (isMouseDown) return;
 
-      handleSelection();
+      handleSelection(null);
     }, 400);
   });
 
