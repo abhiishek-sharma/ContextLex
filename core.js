@@ -288,7 +288,8 @@
   //   options.fetchImpl  fetch-compatible function
   //   options.signal     AbortSignal that cancels the lookup
   //   options.cache      cache from createCache()
-  //   options.isOnline   returns false when the browser is offline
+  //   options.isOnline   returns false when the browser reports no
+  //                      connection; only used to label a failed request
   //   options.timeoutMs  time allowed for the whole lookup
   //
   // Resolves (it does not reject) with one of:
@@ -336,7 +337,7 @@
     async function lookupWord(word) {
       const cached = cache ? cache.get(word) : undefined;
       if (cached) return cached;
-      if (controller.signal.aborted || !isOnline()) return failure();
+      if (controller.signal.aborted) return failure();
 
       let result;
       try {

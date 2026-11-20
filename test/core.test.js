@@ -581,12 +581,27 @@ describe("lookup", () => {
     assert.deepEqual(await core.lookup("sample", { fetchImpl }), { status: "error" });
   });
 
-  test("reports offline without sending a request", async () => {
+  test("sends the request even when the browser reports no connection", async () => {
+    // navigator.onLine can be false while requests still get through.
     const fetchImpl = fakeFetch(({ word }) => json(200, entryFor(word)));
     const result = await core.lookup("sample", { fetchImpl, isOnline: () => false });
 
+    assert.equal(result.status, "ok");
+    assert.equal(fetchImpl.calls.length, 1);
+  });
+
+  test("labels a failed request offline when the browser reports no connection", async () => {
+    const fetchImpl = fakeFetch(() => Promise.reject(new TypeError("Failed to fetch")));
+    const result = await core.lookup("sample", { fetchImpl, isOnline: () => false });
+
     assert.deepEqual(result, { status: "offline" });
-    assert.equal(fetchImpl.calls.length, 0);
+    assert.equal(fetchImpl.calls.length, 1);
+  });
+
+  test("labels an HTTP error by its status even when the browser reports no connection", async () => {
+    const fetchImpl = fakeFetch(() => json(503, {}));
+    const result = await core.lookup("sample", { fetchImpl, isOnline: () => false });
+    assert.deepEqual(result, { status: "error", httpStatus: 503 });
   });
 
   test("reports offline when the connection drops during the request", async () => {
