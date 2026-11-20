@@ -112,9 +112,11 @@ GitHub Actions (`.github/workflows/ci.yml`) runs `npm run check` and `npm test` 
 
 ### What the tests cover
 
-`test/core.test.js` covers `core.js`, using a stand-in for `fetch`. `test/extension.test.js` checks `manifest.json`, the icon files, that the changelog has an entry for the manifest version, and that no content script writes HTML strings into the page.
+`test/core.test.js` covers `core.js`, using a stand-in for `fetch`. `test/extension.test.js` checks `manifest.json`, the icon files, that every selector in `styles.css` is scoped to the tooltip, that the changelog has an entry for the manifest version, and that no content script writes HTML strings into the page.
 
-`content.js` has no automated tests. It needs a real DOM, and the project has no browser test set-up.
+`test/content.test.js` runs `core.js` and `content.js` together, in manifest order, against a minimal stand-in for the page. It checks that `content.js` finds everything it uses from `core.js` and sets up its event listeners.
+
+What `content.js` does with a real page (selections, the tooltip, dismissing it) has no automated tests. That needs a real DOM, and the project has no browser test set-up.
 
 ### File structure
 
@@ -130,7 +132,8 @@ ContextLex/
 │   └── generate-icons.js      # Draws the icons
 ├── test/
 │   ├── core.test.js           # Tests for core.js
-│   └── extension.test.js      # Checks on the manifest, icons and scripts
+│   ├── content.test.js        # Loads core.js and content.js together
+│   └── extension.test.js      # Checks on the manifest, icons, styles and scripts
 ├── .github/workflows/ci.yml   # CI: syntax check and tests
 ├── package.json               # Script shortcuts only, no dependencies
 ├── CHANGELOG.md
